@@ -1,0 +1,33 @@
+# Claude Code tooling state
+.claude/
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.vscode/
+*.swp
+*.swo
+
+# NuGet
+packages/
+*.nupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Build output
+publish/
+dist/
+out/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets / environment
+*.env
+appsettings.Local.json
+appsettings.local.json
