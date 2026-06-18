@@ -450,7 +450,19 @@ public class HclParser : IHclParser
                 while (i < tokens.Count && depth > 0)
                 {
                     var t = tokens[i];
-                    if (t.Kind == TokenKind.Newline) { i++; continue; }
+                    if (t.Kind == TokenKind.Newline)
+                    {
+                        // In object/tuple type bodies, newlines separate attributes just like commas.
+                        // Emit a comma so ParseObjectAttributes can split on it correctly.
+                        if (sb.Length > 0)
+                        {
+                            char last = sb[sb.Length - 1];
+                            if (last != '{' && last != '(' && last != '[' && last != ',')
+                                sb.Append(',');
+                        }
+                        i++;
+                        continue;
+                    }
                     if (t.Kind == TokenKind.OpenParen) { depth++; sb.Append('('); }
                     else if (t.Kind == TokenKind.CloseParen) { depth--; if (depth >= 0) sb.Append(')'); }
                     else if (t.Kind == TokenKind.OpenBrace) sb.Append('{');
