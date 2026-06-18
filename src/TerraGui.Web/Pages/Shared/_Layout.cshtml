@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="TerraGui — Terraform tfvars form generator" />
+    <title>@ViewData["Title"] — TerraGui</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <header class="tg-header">
+        <nav class="navbar navbar-expand-lg">
+            <div class="container">
+                <a class="navbar-brand tg-brand" href="/">
+                    <span class="tg-logo-icon">
+                        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="28" height="28" rx="6" fill="#7B42BC"/>
+                            <path d="M7 8h4v12H7V8zm10 0h4v5h-4V8zm0 7h4v5h-4v-5zm-5-4h4v4h-4v-4z" fill="white"/>
+                        </svg>
+                    </span>
+                    <span class="tg-brand-text">TerraGui</span>
+                </a>
+                <div class="ms-auto d-flex align-items-center gap-3">
+                    <span class="tg-tagline d-none d-md-inline">Terraform tfvars generator</span>
+                    <a href="https://github.com" class="btn btn-outline-light btn-sm" target="_blank" rel="noopener">
+                        <i class="bi bi-github me-1"></i>GitHub
+                    </a>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container-fluid px-0">
+        @RenderBody()
+    </main>
+
+    <footer class="tg-footer mt-auto py-3">
+        <div class="container">
+            <div class="d-flex flex-wrap justify-content-between align-items-center">
+                <span class="text-muted small">
+                    &copy; @DateTime.UtcNow.Year TerraGui — Open source Terraform tfvars generator
+                </span>
+                <span class="text-muted small">
+                    Built with ASP.NET Core 8 &amp; Bootstrap 5
+                </span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @RenderSection("Scripts", required: false)
+</body>
+</html>
