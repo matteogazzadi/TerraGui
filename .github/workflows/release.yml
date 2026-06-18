@@ -1,0 +1,124 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Tag & Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore & Test
+        run: |
+          dotnet restore TerraGui.sln
+          dotnet test TerraGui.sln --configuration Release --verbosity normal
+
+      - name: Determine next version
+        id: version
+        run: |
+          # Get latest semver tag; default to v0.0.0 if none exists
+          LATEST=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1)
+          if [ -z "$LATEST" ]; then
+            LATEST="v0.0.0"
+          fi
+          echo "Latest tag: $LATEST"
+
+          # Strip leading 'v' and split
+          VERSION="${LATEST#v}"
+          MAJOR=$(echo "$VERSION" | cut -d. -f1)
+          MINOR=$(echo "$VERSION" | cut -d. -f2)
+          PATCH=$(echo "$VERSION" | cut -d. -f3)
+
+          # Increment patch
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="v${MAJOR}.${MINOR}.${NEW_PATCH}"
+          echo "New version: $NEW_VERSION"
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Publish win-x64 (self-contained)
+        run: |
+          dotnet publish src/TerraGui.Web/TerraGui.Web.csproj \
+            --configuration Release \
+            --runtime win-x64 \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:EnableCompressionInSingleFile=true \
+            --output ./publish/win-x64
+
+      - name: Publish linux-x64 (self-contained)
+        run: |
+          dotnet publish src/TerraGui.Web/TerraGui.Web.csproj \
+            --configuration Release \
+            --runtime linux-x64 \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:EnableCompressionInSingleFile=true \
+            --output ./publish/linux-x64
+
+      - name: Publish framework-dependent (Azure Web App)
+        run: |
+          dotnet publish src/TerraGui.Web/TerraGui.Web.csproj \
+            --configuration Release \
+            --output ./publish/azure
+
+      - name: Package artifacts
+        run: |
+          VERSION=${{ steps.version.outputs.new_version }}
+
+          cd publish
+          zip -r "../terragui-${VERSION}-win-x64.zip" win-x64/
+          tar -czf "../terragui-${VERSION}-linux-x64.tar.gz" linux-x64/
+          zip -r "../terragui-${VERSION}-azure-webapp.zip" azure/
+          cd ..
+
+      - name: Create git tag
+        run: |
+          VERSION=${{ steps.version.outputs.new_version }}
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$VERSION"
+          git push origin "$VERSION"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.new_version }}
+          name: "TerraGui ${{ steps.version.outputs.new_version }}"
+          body: |
+            ## TerraGui ${{ steps.version.outputs.new_version }}
+
+            Automated release from merge to `main`.
+
+            ### Artifacts
+            | File | Platform |
+            |------|----------|
+            | `terragui-*-win-x64.zip` | Windows x64 (self-contained, no .NET required) |
+            | `terragui-*-linux-x64.tar.gz` | Linux x64 (self-contained, no .NET required) |
+            | `terragui-*-azure-webapp.zip` | Azure Web App deployment package |
+
+            ### Running locally
+            **Windows:** Extract the zip, run `TerraGui.Web.exe`
+            **Linux:** Extract the tar.gz, run `chmod +x TerraGui.Web && ./TerraGui.Web`
+
+            Then open http://localhost:5000 in your browser.
+          files: |
+            terragui-${{ steps.version.outputs.new_version }}-win-x64.zip
+            terragui-${{ steps.version.outputs.new_version }}-linux-x64.tar.gz
+            terragui-${{ steps.version.outputs.new_version }}-azure-webapp.zip
+          draft: false
+          prerelease: false
