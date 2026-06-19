@@ -126,6 +126,151 @@ async function parseFiles() {
   }
 }
 
+// ---------- Type helpers ------------------------------------
+
+function jsFindMatchingBrace(s, openIdx) {
+  let depth = 0;
+  for (let i = openIdx; i < s.length; i++) {
+    if (s[i] === '{') depth++;
+    else if (s[i] === '}') { depth--; if (depth === 0) return i; }
+  }
+  return -1;
+}
+
+function jsFindMatchingParen(s, openIdx) {
+  let depth = 0;
+  for (let i = openIdx; i < s.length; i++) {
+    if (s[i] === '(') depth++;
+    else if (s[i] === ')') { depth--; if (depth === 0) return i; }
+  }
+  return -1;
+}
+
+function jsSplitAtDepth(s, sep) {
+  const parts = [];
+  let depth = 0, start = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if ('({['.includes(c)) depth++;
+    else if (')}]'.includes(c)) depth--;
+    else if (c === sep && depth === 0) { parts.push(s.slice(start, i)); start = i + 1; }
+  }
+  parts.push(s.slice(start));
+  return parts;
+}
+
+function jsFindEqAtDepth(s) {
+  let depth = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if ('({['.includes(c)) depth++;
+    else if (')}]'.includes(c)) depth--;
+    else if (c === '=' && depth === 0) return i;
+  }
+  return -1;
+}
+
+function jsFindCommaAtDepth(s) {
+  let depth = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if ('({['.includes(c)) depth++;
+    else if (')}]'.includes(c)) depth--;
+    else if (c === ',' && depth === 0) return i;
+  }
+  return -1;
+}
+
+function jsExtractOptionalInnerType(s) {
+  const openP = s.indexOf('(');
+  if (openP < 0) return s;
+  const closeP = jsFindMatchingParen(s, openP);
+  if (closeP < 0) return s;
+  const inner = s.slice(openP + 1, closeP).trim();
+  const comma = jsFindCommaAtDepth(inner);
+  return comma >= 0 ? inner.slice(0, comma).trim() : inner;
+}
+
+function parseTypeAttrs(typeStr) {
+  const t = typeStr.trim().toLowerCase();
+  if (!t.startsWith('object(')) return {};
+  const openBrace = typeStr.indexOf('{');
+  if (openBrace < 0) return {};
+  const closeBrace = jsFindMatchingBrace(typeStr, openBrace);
+  if (closeBrace < 0) return {};
+  const inner = typeStr.slice(openBrace + 1, closeBrace).trim();
+  const parts = jsSplitAtDepth(inner, ',');
+  const result = {};
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const eqIdx = jsFindEqAtDepth(trimmed);
+    if (eqIdx < 0) continue;
+    const name = trimmed.slice(0, eqIdx).trim();
+    let type = trimmed.slice(eqIdx + 1).trim();
+    if (type.toLowerCase().startsWith('optional(')) type = jsExtractOptionalInnerType(type);
+    if (name) result[name] = type;
+  }
+  return result;
+}
+
+function generateTypeValue(typeStr, depth) {
+  const t = typeStr.trim().toLowerCase();
+  if (t === 'string') return '""';
+  if (t === 'number') return '0';
+  if (t === 'bool') return 'false';
+  if (t.startsWith('optional(')) return generateTypeValue(jsExtractOptionalInnerType(typeStr), depth);
+  if (t.startsWith('list(') || t.startsWith('set(')) {
+    const openP = typeStr.indexOf('(');
+    const closeP = openP >= 0 ? jsFindMatchingParen(typeStr, openP) : -1;
+    if (openP >= 0 && closeP > openP) {
+      const elemType = typeStr.slice(openP + 1, closeP).trim();
+      if (elemType.trim().toLowerCase().startsWith('object(')) {
+        const attrs = parseTypeAttrs(elemType);
+        const ind = '  '.repeat(depth + 1);
+        return `[\n${ind}${generateHclTemplate(attrs, depth + 1)}\n${'  '.repeat(depth)}]`;
+      }
+    }
+    return '[]';
+  }
+  if (t.startsWith('map(')) {
+    const openP = typeStr.indexOf('(');
+    const closeP = openP >= 0 ? jsFindMatchingParen(typeStr, openP) : -1;
+    if (openP >= 0 && closeP > openP) {
+      const valType = typeStr.slice(openP + 1, closeP).trim();
+      if (valType.trim().toLowerCase().startsWith('object(')) {
+        const attrs = parseTypeAttrs(valType);
+        const ind = '  '.repeat(depth + 1);
+        return `{\n${ind}key = ${generateHclTemplate(attrs, depth + 1)}\n${'  '.repeat(depth)}}`;
+      }
+    }
+    return '{}';
+  }
+  if (t.startsWith('object(')) {
+    const attrs = parseTypeAttrs(typeStr);
+    return generateHclTemplate(attrs, depth);
+  }
+  return '""';
+}
+
+function generateHclTemplate(attrs, depth) {
+  if (!attrs || Object.keys(attrs).length === 0) return `{\n${'  '.repeat(depth)}}`;
+  const indent = '  '.repeat(depth + 1);
+  const closeInd = '  '.repeat(depth);
+  const lines = Object.entries(attrs).map(([name, type]) =>
+    `${indent}${name} = ${generateTypeValue(type, depth + 1)}`
+  );
+  return `{\n${lines.join('\n')}\n${closeInd}}`;
+}
+
+function abbreviateType(typeStr) {
+  if (!typeStr) return '';
+  if (typeStr.trim().length <= 30) return typeStr.trim();
+  const t = typeStr.trim().toLowerCase();
+  if (t.startsWith('object(')) return 'object({…})';
+  return typeStr.trim().slice(0, 28) + '…';
+}
+
 // ---------- Form rendering ----------------------------------
 function renderForm(variables) {
   if (variables.length === 0) {
@@ -184,7 +329,7 @@ function buildVariableCard(v, idx) {
             data-bs-toggle="collapse" data-bs-target="#${collapseId}"
             aria-expanded="true" aria-controls="${collapseId}">
       <span class="tg-var-name">${escHtml(v.name)}</span>
-      <span class="tg-var-type-badge">${escHtml(v.type)}</span>
+      <span class="tg-var-type-badge" title="${escHtml(v.type)}">${escHtml(abbreviateType(v.type))}</span>
       ${v.required ? '<span class="tg-required-star" title="Required">*</span>' : ''}
       ${v.sensitive ? '<i class="bi bi-shield-lock-fill tg-sensitive-icon" title="Sensitive"></i>' : ''}
       ${prefilledIcon}
@@ -192,7 +337,7 @@ function buildVariableCard(v, idx) {
     </button>
     <div class="collapse show" id="${collapseId}">
       <div class="tg-var-body">
-        ${v.description ? `<p class="tg-var-description"><i class="bi bi-info-circle me-1"></i>${escHtml(v.description)}</p>` : ''}
+        ${v.description ? `<details class="tg-var-description-wrap"><summary class="tg-var-description-summary"><i class="bi bi-info-circle me-1"></i>Description</summary><pre class="tg-var-description">${escHtml(v.description.trim())}</pre></details>` : ''}
         ${buildInputHtml(v, idx, initVal)}
         ${v.validations && v.validations.length > 0
           ? v.validations.map(val => `<div class="tg-validation-hint"><i class="bi bi-exclamation-triangle me-1"></i>${escHtml(val.errorMessage)}</div>`).join('')
@@ -271,19 +416,18 @@ function buildInputHtml(v, idx, initVal) {
 
   if (t === 'object') {
     const attrs = v.objectAttributes || {};
-    const initObj = parseObjectInit(initVal);
-    return `<div class="tg-object-editor" id="${inputId}" data-var="${escHtml(v.name)}">
-      ${Object.entries(attrs).map(([attrName, attrType], i) => {
-        const attrVal = initObj[attrName] || '';
-        return `<div>
-          <div class="tg-obj-attr-label">${escHtml(attrName)} <span class="text-muted">(${escHtml(attrType)})</span></div>
-          <input type="${attrType === 'number' ? 'number' : attrType === 'bool' ? 'checkbox' : 'text'}"
-                 class="form-control form-control-sm font-monospace tg-obj-attr"
-                 data-attr="${escHtml(attrName)}" value="${escHtml(stripQuotes(attrVal))}"
-                 placeholder="${escHtml(attrName)}" />
-        </div>`;
-      }).join('')}
-    </div>`;
+    let template;
+    if (initVal && initVal.trim().startsWith('{')) {
+      template = initVal.trim();
+    } else {
+      template = generateHclTemplate(attrs, 0);
+    }
+    const nLines = Math.min(24, Math.max(6, template.split('\n').length + 1));
+    return `<textarea class="form-control tg-var-input tg-hcl-editor font-monospace"
+               id="${inputId}" data-var="${escHtml(v.name)}"
+               rows="${nLines}"
+               spellcheck="false"
+               placeholder="HCL object value">${escHtml(template)}</textarea>`;
   }
 
   // any / fallback → textarea
@@ -442,13 +586,7 @@ function getVariableValue(varName, inputType) {
   }
 
   if (inputType === 'object') {
-    const obj = {};
-    el.querySelectorAll('.tg-obj-attr').forEach(attr => {
-      const name = attr.dataset.attr;
-      const val  = attr.type === 'checkbox' ? (attr.checked ? 'true' : 'false') : attr.value.trim();
-      if (name && val !== '') obj[name] = val;
-    });
-    return JSON.stringify(obj);
+    return el ? el.value.trim() : '';
   }
 
   return el.value;
@@ -523,6 +661,8 @@ function formatValueForPreview(v, raw) {
     } catch { return raw; }
   }
   if (t === 'object') {
+    // Value is raw HCL from textarea — return as-is
+    if (raw.trim().startsWith('{')) return raw.trim();
     try {
       const obj = JSON.parse(raw);
       const pairs = Object.entries(obj).map(([k, vv]) => `  ${k} = "${vv}"`).join('\n');

@@ -35,7 +35,11 @@ public class TfVarsGenerator : ITfVarsGenerator
             // Add description comment
             if (!string.IsNullOrWhiteSpace(variable.Description))
             {
-                sb.AppendLine($"# {variable.Description}");
+                foreach (var dl in variable.Description.Split('\n'))
+                {
+                    var trimmedLine = dl.TrimEnd();
+                    sb.AppendLine($"# {trimmedLine}");
+                }
             }
 
             if (variable.Sensitive)

@@ -519,6 +519,9 @@ public class HclParser : IHclParser
             case TokenKind.OpenBracket:
                 return ReadBracketValue(tokens, i);
 
+            case TokenKind.OpenParen:
+                return ReadParenValue(tokens, i);
+
             default:
                 return ("", i + 1);
         }
@@ -535,7 +538,7 @@ public class HclParser : IHclParser
         while (i < tokens.Count && depth > 0)
         {
             var t = tokens[i];
-            if (t.Kind == TokenKind.Newline) { sb.Append(' '); i++; continue; }
+            if (t.Kind == TokenKind.Newline) { sb.Append('\n'); i++; continue; }
             if (t.Kind == TokenKind.OpenBrace) { depth++; sb.Append('{'); }
             else if (t.Kind == TokenKind.CloseBrace) { depth--; if (depth >= 0) sb.Append('}'); }
             else if (t.Kind == TokenKind.Equals) sb.Append(" = ");
@@ -559,13 +562,38 @@ public class HclParser : IHclParser
         while (i < tokens.Count && depth > 0)
         {
             var t = tokens[i];
-            if (t.Kind == TokenKind.Newline) { sb.Append(' '); i++; continue; }
+            if (t.Kind == TokenKind.Newline) { sb.Append('\n'); i++; continue; }
             if (t.Kind == TokenKind.OpenBracket) { depth++; sb.Append('['); }
             else if (t.Kind == TokenKind.CloseBracket) { depth--; if (depth >= 0) sb.Append(']'); }
             else if (t.Kind == TokenKind.OpenBrace) sb.Append('{');
             else if (t.Kind == TokenKind.CloseBrace) sb.Append('}');
             else if (t.Kind == TokenKind.Equals) sb.Append(" = ");
             else if (t.Kind == TokenKind.Comma) sb.Append(", ");
+            else if (t.Kind == TokenKind.QuotedString) sb.Append($"\"{EscapeString(t.Value)}\"");
+            else sb.Append(t.Value);
+            i++;
+        }
+
+        return (sb.ToString(), i);
+    }
+
+    private static (string value, int nextIndex) ReadParenValue(List<Token> tokens, int start)
+    {
+        var sb = new StringBuilder();
+        sb.Append('(');
+        int i = start + 1;
+        int depth = 1;
+
+        while (i < tokens.Count && depth > 0)
+        {
+            var t = tokens[i];
+            if (t.Kind == TokenKind.Newline) { i++; continue; }
+            if (t.Kind == TokenKind.OpenParen)  { depth++; sb.Append('('); }
+            else if (t.Kind == TokenKind.CloseParen) { depth--; if (depth >= 0) sb.Append(')'); }
+            else if (t.Kind == TokenKind.OpenBrace)  sb.Append('{');
+            else if (t.Kind == TokenKind.CloseBrace) sb.Append('}');
+            else if (t.Kind == TokenKind.Equals)     sb.Append(" = ");
+            else if (t.Kind == TokenKind.Comma)      sb.Append(", ");
             else if (t.Kind == TokenKind.QuotedString) sb.Append($"\"{EscapeString(t.Value)}\"");
             else sb.Append(t.Value);
             i++;

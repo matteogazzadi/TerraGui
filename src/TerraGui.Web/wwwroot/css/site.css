@@ -125,6 +125,8 @@ code {
   padding: .18em .5em; border-radius: 4px;
   background: var(--tg-code-bg); color: var(--tg-muted);
   font-family: 'JetBrains Mono', monospace;
+  max-width: 200px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; display: inline-block; vertical-align: middle;
 }
 .tg-required-star { color: #dc3545; font-weight: 700; font-size: .85rem; }
 .tg-sensitive-icon { color: #fd7e14; font-size: .85rem; }
@@ -135,7 +137,15 @@ code {
 
 .tg-var-body { padding: .85rem 1.1rem 1rem; border-top: 1px solid var(--tg-border); }
 
-.tg-var-description { font-size: .82rem; color: var(--tg-muted); margin-bottom: .65rem; }
+.tg-var-description-wrap { margin-bottom: .65rem; }
+.tg-var-description-summary { font-size: .82rem; color: var(--tg-muted); cursor: pointer; }
+.tg-var-description {
+  font-size: .78rem; color: var(--tg-muted); margin: .4rem 0 0;
+  white-space: pre-wrap; word-break: break-word;
+  max-height: 180px; overflow-y: auto;
+  background: var(--tg-code-bg); border-radius: 6px;
+  padding: .5rem .65rem; font-family: 'JetBrains Mono', monospace;
+}
 
 .tg-field-label { font-size: .82rem; font-weight: 600; color: var(--tg-text); margin-bottom: .3rem; }
 
@@ -148,6 +158,15 @@ code {
 /* object editor */
 .tg-object-editor { display: flex; flex-direction: column; gap: .55rem; }
 .tg-obj-attr-label { font-size: .78rem; font-weight: 600; color: var(--tg-muted); font-family: 'JetBrains Mono', monospace; }
+
+/* HCL textarea for object types */
+.tg-hcl-editor {
+  min-height: 6rem;
+  resize: vertical;
+  font-size: .8rem;
+  line-height: 1.5;
+  tab-size: 2;
+}
 
 /* validation hint */
 .tg-validation-hint { font-size: .77rem; color: #fd7e14; margin-top: .3rem; }
