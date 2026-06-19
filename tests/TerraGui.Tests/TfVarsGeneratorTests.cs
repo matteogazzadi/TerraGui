@@ -124,6 +124,26 @@ public class TfVarsGeneratorTests
         Assert.DoesNotContain("region =", output);
     }
 
+    // ---- Sensitive object variable stays as HCL block ---------
+
+    [Fact]
+    public void Generate_SensitiveObjectVariable_RendersAsHclBlock()
+    {
+        var v = new TerraformVariable
+        {
+            Name      = "hyperv",
+            Type      = "object({server = string, insecure = bool})",
+            Sensitive = true
+        };
+        var values = new Dictionary<string, string>
+        {
+            ["hyperv"] = "{\n  server = \"myhost\"\n  insecure = true\n}"
+        };
+        var output = _gen.Generate(new[] { v }, values);
+        Assert.Contains("hyperv = {", output);
+        Assert.DoesNotContain("hyperv = \"{", output);
+    }
+
     // ---- String already quoted ---------------------------------
 
     [Fact]

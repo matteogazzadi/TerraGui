@@ -66,8 +66,6 @@ public class TfVarsGenerator : ITfVarsGenerator
         string type = variable.Type.Trim().ToLowerInvariant();
         rawValue = rawValue.Trim();
 
-        // If the value already looks like a complete HCL literal (starts with { or [),
-        // pass it through as-is (with normalization)
         if (type == "number")
         {
             return rawValue;
@@ -78,23 +76,25 @@ public class TfVarsGenerator : ITfVarsGenerator
             return rawValue.ToLowerInvariant() == "true" ? "true" : "false";
         }
 
-        if (type == "string" || (variable.Sensitive && type != "number" && type != "bool"))
-        {
-            // Strip surrounding quotes if already quoted
-            if (rawValue.StartsWith('"') && rawValue.EndsWith('"') && rawValue.Length >= 2)
-                rawValue = rawValue[1..^1];
-            return $"\"{EscapeHclString(rawValue)}\"";
-        }
-
+        // Complex structured types must be checked BEFORE the sensitive/string fallback.
+        // A sensitive variable with type = object({…}) (e.g. hyperv) must still render
+        // as an HCL block, not get quoted as a string.
         if (type.StartsWith("list(") || type.StartsWith("set(") || type.StartsWith("tuple("))
         {
-            // Expected: JSON-ish array or newline-separated values
             return FormatListValue(rawValue, type);
         }
 
         if (type.StartsWith("map(") || type.StartsWith("object("))
         {
             return FormatMapValue(rawValue);
+        }
+
+        if (type == "string" || variable.Sensitive)
+        {
+            // Strip surrounding quotes if already quoted
+            if (rawValue.StartsWith('"') && rawValue.EndsWith('"') && rawValue.Length >= 2)
+                rawValue = rawValue[1..^1];
+            return $"\"{EscapeHclString(rawValue)}\"";
         }
 
         // "any" or unknown — pass through as-is, quoting if it looks like plain text
