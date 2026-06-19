@@ -610,7 +610,9 @@ function updatePreview() {
     if (v.required && !hasVal) { allRequiredFilled = false; return; }
     if (!hasVal) return; // skip blanks / use defaults
 
-    if (v.description) lines.push(`# ${v.description}`);
+    if (v.description) {
+      v.description.split('\n').forEach(dl => lines.push(`# ${dl.trimEnd()}`));
+    }
     if (v.sensitive) lines.push('# sensitive');
     lines.push(`${v.name} = ${formatValueForPreview(v, raw)}`);
     lines.push('');
